@@ -1,0 +1,19 @@
+services:
+  klara:
+    build: 
+      context: .
+      tags: 
+        - klara:latest
+    env_file: 
+      - ./.env.prod
+    networks: 
+      - klara_bot
+    
+  redis:
+    image: redis:latest
+    networks: 
+      - klara_bot
+    
+networks:
+  klara_bot:
+    driver: bridge

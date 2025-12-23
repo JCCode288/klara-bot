@@ -1,0 +1,17 @@
+aiohappyeyeballs
+aiohttp
+aiosignal
+attrs
+audioop-lts
+cffi
+discord.py[voice]
+frozenlist
+idna
+multidict
+propcache
+pycparser
+PyNaCl
+yarl
+yt-dlp
+python-dotenv
+redis

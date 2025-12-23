@@ -1,0 +1,162 @@
+import discord
+from discord.ext import commands
+import os
+from dotenv import load_dotenv
+from guild_player import GuildPlayer
+from ctypes.util import find_library
+
+load_dotenv()
+
+intents = discord.Intents.default()
+intents.message_content = True
+
+env = os.getenv("PY_ENV", "development")
+if env == "production":
+    print("=== Loading opus in prod ===")
+    discord.opus.load_opus("libopus.so")
+
+    if not discord.opus.is_loaded():
+        raise Exception("Opus is not loaded")
+
+bot = commands.AutoShardedBot(command_prefix='!', intents=intents)
+
+players = {}
+
+def get_player(ctx):
+    """Gets the player for the current guild."""
+    guild = ctx.guild
+    if guild.id not in players:
+        players[guild.id] = GuildPlayer(guild, bot)
+    return players[guild.id]
+
+@bot.event
+async def on_ready():
+    print(f'Logged in as {bot.user.name}')
+
+@bot.event
+async def on_voice_state_update(member, before, after):
+    if member.id == bot.user.id and before.channel is not None and after.channel is None:
+        if member.guild.id in players:
+            del players[member.guild.id]
+
+@bot.command()
+async def join(ctx):
+    if ctx.author.voice:
+        channel = ctx.author.voice.channel
+        player = get_player(ctx)
+        await player.join(channel)
+        await ctx.send(f"Joined {channel.name}")
+    else:
+        await ctx.send("You are not in a voice channel.")
+
+@bot.command()
+async def leave(ctx):
+    player = get_player(ctx)
+    await player.leave()
+    await ctx.send("Left the voice channel.")
+
+@bot.command()
+async def play(ctx, *, query=None):
+    player = get_player(ctx)
+
+    if not query:
+        if ctx.author.voice:
+            await player.join(ctx.author.voice.channel)
+        else:
+            return await ctx.send("You are not in a voice channel.")
+        
+        return await player.play_next(ctx)
+    
+    if not player.voice_client:
+        if ctx.author.voice:
+            await player.join(ctx.author.voice.channel)
+        else:
+            return await ctx.send("You are not in a voice channel.")
+
+    await ctx.send(f"Searching for `{query}`...")
+    await player.play(query, ctx)
+
+@bot.command()
+async def skip(ctx):
+    player = get_player(ctx)
+    await player.skip()
+    await ctx.send("Skipped the current song.")
+
+def format_duration(seconds):
+    minutes, seconds = divmod(seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours:
+        return f"{int(hours):02}:{int(minutes):02}:{int(seconds):02}"
+    return f"{int(minutes):02}:{int(seconds):02}"
+
+@bot.command()
+async def queue(ctx):
+    player = get_player(ctx)
+    song_queue = player.get_queue()
+    if song_queue:
+        messages = []
+        current_message = "**Song Queue:**\n"
+        for i, song_data in enumerate(song_queue):
+            title = song_data.get('title', 'Unknown Title')
+            duration = song_data.get('duration', 0)
+            formatted_duration = format_duration(duration)
+            line = f"{i+1}. {title} ({formatted_duration})\n"
+
+            if len(current_message) + len(line) > 1990: 
+                messages.append(current_message)
+                current_message = "...\n" + line
+            else:
+                current_message += line
+        messages.append(current_message)
+
+        for msg in messages:
+            await ctx.send(msg)
+    else:
+        await ctx.send("The song queue is empty.")
+
+@bot.command()
+async def stop(ctx):
+    player = get_player(ctx)
+    await player.stop()
+    await ctx.send("Stopped the music and cleared the queue.")
+
+@bot.command()
+async def pause(ctx):
+    player = get_player(ctx)
+    if player.voice_client and player.voice_client.is_playing():
+        player.voice_client.pause()
+        await ctx.send("Paused the song.")
+    else:
+        await ctx.send("I'm not playing anything.")
+
+@bot.command()
+async def resume(ctx):
+    """Resumes the current song."""
+    player = get_player(ctx)
+    if player.voice_client and player.voice_client.is_paused():
+        player.voice_client.resume()
+        await ctx.send("Resumed the song.")
+    else:
+        await ctx.send("The song is not paused.")
+
+@bot.command()
+async def remove(ctx, index: int):
+    player = get_player(ctx)
+    player.remove_from_queue(index - 1)
+    await ctx.send(f"Removed song at position {index}.")
+
+@bot.command()
+async def repeat(ctx):
+    player = get_player(ctx)
+    is_repeating = player.toggle_repeat()
+    if is_repeating:
+        await ctx.send("Repeat mode is now ON.")
+    else:
+        await ctx.send("Repeat mode is now OFF.")
+
+
+TOKEN = os.getenv('DISCORD_TOKEN')
+if TOKEN is None:
+    print("DISCORD_TOKEN not found in .env file. Please create a .env file and add your bot token.")
+else:
+    bot.run(TOKEN)
