@@ -26,4 +26,4 @@ jobs:
           script: |
             cd ${{ secrets.PROJECT_PATH }}
             git pull origin --no-ff master
-            make compose
+            docker compose up -d --build 
