@@ -14,3 +14,6 @@ build:
 deploy:
 	mv env-prod .env.prod
 	docker compose up --build
+
+compose:
+	docker compose up -d --build
