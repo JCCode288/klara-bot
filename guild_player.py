@@ -1,7 +1,7 @@
 import asyncio
 import discord
 import yt_dlp
-from redis_queue import add_to_queue, get_from_queue, get_queue, clear_queue, remove_from_queue, set_repeat, get_repeat
+from redis_queue import add_to_queue, get_from_queue, get_queue, clear_queue, remove_from_queue, set_repeat, get_repeat, remove_first_queue
 
 YDL_OPTIONS = {'format': 'bestaudio', 'noplaylist': 'True'}
 FFMPEG_OPTIONS = {
@@ -60,6 +60,14 @@ class GuildPlayer:
         song_data = get_from_queue(self.guild.id)
         self.current_song_url = song_data
 
+        def after_play(e):
+            remove_first_queue(self.guild.id)
+
+            if self.repeat:
+                add_to_queue(self.guild.id, self.current_song_url)
+            
+            return self.bot.loop.create_task(self.play_next(ctx))
+
         if not self.current_song_url:
             self.is_playing = False
             return ctx.send("No more song to play.")
@@ -72,11 +80,8 @@ class GuildPlayer:
             self.is_playing = True
             self.voice_client.play(
                 discord.FFmpegPCMAudio(song_data['url'], **FFMPEG_OPTIONS),
-                after=lambda e: self.bot.loop.create_task(self.play_next(ctx)),
+                after=after_play,
             )
-
-            if self.repeat:
-                add_to_queue(self.guild.id, self.current_song_url)
         else:
             ctx.send("Something happened. Please try again.")
             print("Failed to play song.")
