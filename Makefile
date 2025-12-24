@@ -16,4 +16,4 @@ deploy:
 	docker compose up --build
 
 compose:
-	docker compose up --build
+	docker compose up -d --build
