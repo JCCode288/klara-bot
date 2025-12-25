@@ -18,7 +18,7 @@ if env == "production":
     if not discord.opus.is_loaded():
         raise Exception("Opus is not loaded")
 
-bot = commands.AutoShardedBot(command_prefix='!', intents=intents)
+bot = commands.AutoShardedBot(command_prefix='#', intents=intents)
 
 players = {}
 
@@ -72,9 +72,19 @@ async def play(ctx, *, query=None):
             await player.join(ctx.author.voice.channel)
         else:
             return await ctx.send("You are not in a voice channel.")
+        
+    queries = list(map(lambda x: x.strip(), query.split(";;")))
 
-    await ctx.send(f"Searching for `{query}`...")
-    await player.play(query, ctx)
+    if len(queries) < 2 and query:
+        await ctx.send(f"Searching for `{query}`...")
+        await player.play(query, ctx)
+    elif len(queries) >= 2:
+        await ctx.send(f"Multiple query found for `{", ".join(queries)}...`")
+
+        for query in queries:
+            await player.play(query, ctx)
+    else:
+        await ctx.send(f"Invalid command.")
 
 @bot.command()
 async def skip(ctx):
@@ -113,6 +123,19 @@ async def queue(ctx):
             await ctx.send(msg)
     else:
         await ctx.send("The song queue is empty.")
+
+@bot.command()
+async def np(ctx):
+    player = get_player(ctx)
+    now_playing = player.current_song
+    is_playing = player.is_playing
+
+    if now_playing and is_playing:
+        await ctx.send(f"Currently playing {now_playing.get("title")}.")
+    elif now_playing and not is_playing:
+        await ctx.send(f"First song in the playlist is {now_playing.get("title")}.")
+    else:
+        await ctx.send(f"Clara has no song in the list.")
 
 @bot.command()
 async def stop(ctx):
