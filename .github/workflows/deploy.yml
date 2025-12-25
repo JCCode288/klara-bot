@@ -25,6 +25,6 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd ${{ secrets.PROJECT_PATH }}
-            git pull origin --no-ff master
+            git pull origin
             echo "${{ secrets.ENV_PROD }}" > .env.prod
             docker compose up -d --build 
