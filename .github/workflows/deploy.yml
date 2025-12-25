@@ -5,11 +5,13 @@ on:
     branches:
       - master
   pull_request:
+    types: [closed]
     branches:
       - master
 
 jobs:
   deploy:
+    if: ${{ github.event.pull_request.merged == true }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -24,4 +26,5 @@ jobs:
           script: |
             cd ${{ secrets.PROJECT_PATH }}
             git pull origin --no-ff master
-            make compose
+            echo "${{ secrets.ENV_PROD }}" > .env.prod
+            docker compose up -d --build 

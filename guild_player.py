@@ -16,7 +16,7 @@ class GuildPlayer:
         self.voice_client = None
         self.is_playing = False
         self.repeat = False
-        self.current_song_url = None
+        self.current_song = None
         self.repeat = get_repeat(guild.id) or False
 
 
@@ -39,11 +39,21 @@ class GuildPlayer:
         if not self.voice_client:
             return
 
-        with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
-            info = ydl.extract_info(f"ytsearch:{query}", download=False)['entries'][0]
+        loop = asyncio.get_event_loop()
+
+        def get_song_info():
+            with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
+                return ydl.extract_info(f"ytsearch:{query}", download=False)['entries'][0]
+
+        try:
+            info = await loop.run_in_executor(None, get_song_info)
             url = info['url']
             title = info.get('title', 'Unknown Title')
-            duration = info.get('duration', 0) # duration in seconds
+            duration = info.get('duration', 0)  # duration in seconds
+        except Exception as e:
+            await ctx.send("There was an error searching for the song.")
+            print(f"Error fetching song info: {e}")
+            return
 
         song_data = {"url": url, "title": title, "duration": duration}
         add_to_queue(self.guild.id, song_data)
@@ -58,17 +68,17 @@ class GuildPlayer:
         """Plays the next song in the queue."""
 
         song_data = get_from_queue(self.guild.id)
-        self.current_song_url = song_data
+        self.current_song = song_data
 
         def after_play(e):
             remove_first_queue(self.guild.id)
 
             if self.repeat:
-                add_to_queue(self.guild.id, self.current_song_url)
+                add_to_queue(self.guild.id, self.current_song)
             
             return self.bot.loop.create_task(self.play_next(ctx))
 
-        if not self.current_song_url:
+        if not self.current_song:
             self.is_playing = False
             return ctx.send("No more song to play.")
 
@@ -86,7 +96,7 @@ class GuildPlayer:
             ctx.send("Something happened. Please try again.")
             print("Failed to play song.")
             self.is_playing = False
-            self.current_song_url = None
+            self.current_song = None
 
     def toggle_repeat(self):
         """Toggles the repeat mode."""
@@ -109,7 +119,7 @@ class GuildPlayer:
             self.voice_client.stop()
         clear_queue(self.guild.id)
         self.is_playing = False
-        self.current_song_url = None
+        self.current_song = None
 
     async def skip(self):
         """Skips the current song."""
