@@ -9,16 +9,19 @@ load_dotenv()
 
 intents = discord.Intents.default()
 intents.message_content = True
+prefix = "#"
 
 env = os.getenv("PY_ENV", "development")
+
 if env == "production":
     print("=== Loading opus in prod ===")
+    prefix = "!"
     discord.opus.load_opus("libopus.so")
 
     if not discord.opus.is_loaded():
         raise Exception("Opus is not loaded")
 
-bot = commands.AutoShardedBot(command_prefix='#', intents=intents)
+bot = commands.AutoShardedBot(command_prefix=prefix, intents=intents)
 
 players = {}
 
