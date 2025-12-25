@@ -154,7 +154,7 @@ async def np(ctx):
         await ctx.send(f"Clara has no song in the list.")
 
 @bot.command()
-async def np(ctx):
+async def current_song(ctx):
     player = get_player(ctx)
     now_playing = player.current_song
     is_playing = player.is_playing
