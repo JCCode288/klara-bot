@@ -88,19 +88,7 @@ async def play(ctx, *, query=None):
             await player.play(query, ctx)
     else:
         await ctx.send(f"Invalid command.")
-        
-    queries = list(map(lambda x: x.strip(), query.split(";;")))
-
-    if len(queries) < 2 and query:
-        await ctx.send(f"Searching for `{query}`...")
-        await player.play(query, ctx)
-    elif len(queries) >= 2:
-        await ctx.send(f"Multiple query found for `{", ".join(queries)}...`")
-
-        for query in queries:
-            await player.play(query, ctx)
-    else:
-        await ctx.send(f"Invalid command.")
+   
 
 @bot.command()
 async def skip(ctx):
