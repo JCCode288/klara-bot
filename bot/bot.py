@@ -108,7 +108,7 @@ def format_duration(seconds):
     return f"{int(minutes):02}:{int(seconds):02}"
 
 def parse_queue(song_queue: list[Any]):
-    current_message = "**Song Queue:**\n"
+    message = "**Song Queue:**\n"
 
     for i, song_data in enumerate(song_queue):
         title = song_data.get('title', 'Unknown Title')
@@ -116,7 +116,7 @@ def parse_queue(song_queue: list[Any]):
         formatted_duration = format_duration(duration)
         line = f"{i+1}. {title} ({formatted_duration})\n"
 
-        if len(current_message) + len(line) > 1990: 
+        if len(message) + len(line) > 1990: 
             message = "...\n" + line
         else:
             message += line
