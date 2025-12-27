@@ -1,19 +1,44 @@
 services:
   klara:
     build: 
-      context: .
+      context: ./bot
       tags: 
         - klara:latest
     env_file: 
       - ./.env.prod
     networks: 
       - klara_bot
+    depends_on:
+      - redis
     
   redis:
     image: redis:latest
     networks: 
       - klara_bot
-    
+
+  log_service:
+    build:
+      context: ./log_service
+    env_file:
+      - ./.env.prod
+    networks:
+      - klara_bot
+    depends_on:
+      - redis
+      - neo4j
+
+  neo4j:
+    image: neo4j:latest
+    environment:
+      NEO4J_AUTH: neo4j/passwordNeo4J
+    networks:
+      - klara_bot
+    volumes:
+      - neo4j_data:/data
+
 networks:
   klara_bot:
     driver: bridge
+
+volumes:
+  neo4j_data:
