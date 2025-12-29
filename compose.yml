@@ -25,16 +25,7 @@ services:
       - klara_bot
     depends_on:
       - redis
-      - neo4j
-
-  neo4j:
-    image: neo4j:latest
-    environment:
-      NEO4J_AUTH: neo4j/passwordNeo4J
-    networks:
-      - klara_bot
-    volumes:
-      - neo4j_data:/data
+      - klara
 
 networks:
   klara_bot:
