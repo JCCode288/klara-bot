@@ -58,11 +58,3 @@ def set_repeat(guild_id: int, repeat: bool):
 
 def get_repeat(guild_id: int):
     return bool(r.get(f"repeat:{guild_id}"))
-
-def publish_song_added(data: dict):
-    """Publishes a song added event to a Redis pub/sub channel."""
-    r.publish("song_added", json.dumps(data))
-
-def publish_song_listened(data: dict):
-    """Publishes a song listened event to a Redis pub/sub channel."""
-    r.publish("song_listened", json.dumps(data))
