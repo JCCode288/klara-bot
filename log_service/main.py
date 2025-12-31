@@ -62,6 +62,8 @@ class Neo4jConnection:
     def _create_song_listened_graph(tx, data):
         query = """
         MERGE (s:Song {url: $song_url})
+        ON CREATE SET s.title = $song_title, s.added_at = timestamp(), s.url = $song_url
+        ON MATCH SET s.title = $song_title
 
         MERGE (g:Guild {id: $guild_id})
         ON CREATE SET g.name = $guild_name
