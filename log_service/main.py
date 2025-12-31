@@ -134,10 +134,13 @@ def main():
             channel = message['channel'].decode('utf-8')
             data = json.loads(message['data'])
             
-            if channel == 'song_added':
-                neo4j_conn.process_song_data(data)
-            elif channel == 'song_listened':
-                neo4j_conn.process_song_listened_data(data)
-
+            try:
+                if channel == 'song_added':
+                    neo4j_conn.process_song_data(data)
+                elif channel == 'song_listened':
+                    neo4j_conn.process_song_listened_data(data)
+            except Exception as err:
+                print(f"{err=}")
+                
 if __name__ == "__main__":
     main()
