@@ -1,8 +1,12 @@
 FILENAME = klara-bot.zip
 run:
-	python3 ./bot.py
+	python3 ./bot/bot.py 
+	
+run_logger:
+	python3 ./log_service/main.py
 
 build:
+	cd bot
 	cp .env.prod env-prod
 	zip -ur $(FILENAME) . \
 	-x ".venv/*" \
@@ -17,3 +21,6 @@ deploy:
 
 compose:
 	docker compose up -d --build
+
+dev:
+	docker-compose up -d --build
