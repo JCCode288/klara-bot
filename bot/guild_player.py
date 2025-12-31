@@ -17,8 +17,6 @@ class GuildPlayer:
         self.is_playing = False
         self.repeat = False
         self.current_song = None
-        self.listeners = []
-        self.song_started_by = None
         self.repeat = get_repeat(guild.id) or False
 
     async def join(self, channel: discord.VoiceChannel):
@@ -61,7 +59,7 @@ class GuildPlayer:
             print(f"Error fetching song info: {e}")
             return
 
-        song_data = {"url": url, "title": title, "duration": duration}
+        song_data = {"url": url, "title": title, "duration": duration, "webpage_url": webpage_url}
         add_to_queue(self.guild.id, song_data)
         
         event_data = {
@@ -97,12 +95,11 @@ class GuildPlayer:
             return await ctx.send("Failed to retrieve song url.")
 
         self.current_song = song_data
-        self.song_started_by = ctx.author
 
         def after_play(e):
             listened_members = [
                 {"id": member.id, "name": member.name}
-                for member in self.voice_client.channel.members
+                for member in ctx.voice_client.channel.members
             ]
             
             event_data = {
@@ -113,7 +110,6 @@ class GuildPlayer:
                 "listened_members": listened_members,
             }
             publish_song_listened(event_data)
-            
             remove_first_queue(self.guild.id)
 
             if self.repeat:
@@ -128,7 +124,7 @@ class GuildPlayer:
         if song_data and self.voice_client:
             msg = f"Playing {song_title or "unnamed song"}."
             await ctx.send(msg)
-
+    
             self.is_playing = True
             self.voice_client.play(
                 discord.FFmpegPCMAudio(song_url, **FFMPEG_OPTIONS),
