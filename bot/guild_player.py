@@ -105,7 +105,7 @@ class GuildPlayer:
             event_data = {
                 "guild_id": self.guild.id,
                 "guild_name": self.guild.name,
-                "song_url": song_data.get("webpage_url"),
+                "song_url": song_data.get("webpage_url", song_url),
                 "song_title": song_title,
                 "listened_members": listened_members,
             }
