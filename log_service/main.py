@@ -48,7 +48,7 @@ class Neo4jConnection:
         ON MATCH SET g.name = $guild_name
         
         MERGE (u)-[:ADDED]->(s)
-        MERGE (s)-[:IN_GUILD]->(g)
+        MERGE (u)-[:IN_GUILD]->(g)
         
         FOREACH (tag_name IN $song_tags |
             MERGE (t:Tag {name: tag_name})
@@ -69,13 +69,12 @@ class Neo4jConnection:
         ON CREATE SET g.name = $guild_name
         ON MATCH SET g.name = $guild_name
 
-        MERGE (s)-[:IN_GUILD]->(g)
-
         FOREACH (member IN $listened_members |
             MERGE (u:User {id: member.id})
             ON CREATE SET u.name = member.name
             ON MATCH SET u.name = member.name
             MERGE (u)-[:LISTENED]->(s)
+            MERGE (u)-[:IN_GUILD]->(g)
         )
         """
         tx.run(query, **data)
