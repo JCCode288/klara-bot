@@ -41,6 +41,7 @@ class Neo4jConnection:
 
         MERGE (s:Song {url: $song_url})
         ON CREATE SET s.title = $song_title, s.duration = $song_duration, s.added_at = timestamp()
+        ON MATCH SET s.title = $song_title, s.duration = $song_duration
 
         MERGE (g:Guild {id: $guild_id})
         ON CREATE SET g.name = $guild_name
@@ -61,8 +62,8 @@ class Neo4jConnection:
     def _create_song_listened_graph(tx, data):
         query = """
         MERGE (s:Song {url: $song_url})
-        ON CREATE SET s.title = $song_title, s.duration = $song_duration, s.added_at = timestamp()
-        ON MATCH SET s.title = $song_title, s.duration = $song_duration
+        ON CREATE SET s.title = $song_title, s.added_at = timestamp(), s.url = $song_url
+        ON MATCH SET s.title = $song_title
 
         MERGE (g:Guild {id: $guild_id})
         ON CREATE SET g.name = $guild_name
@@ -133,10 +134,13 @@ def main():
             channel = message['channel'].decode('utf-8')
             data = json.loads(message['data'])
             
-            if channel == 'song_added':
-                neo4j_conn.process_song_data(data)
-            elif channel == 'song_listened':
-                neo4j_conn.process_song_listened_data(data)
-
+            try:
+                if channel == 'song_added':
+                    neo4j_conn.process_song_data(data)
+                elif channel == 'song_listened':
+                    neo4j_conn.process_song_listened_data(data)
+            except Exception as err:
+                print(f"{err=}")
+                
 if __name__ == "__main__":
     main()
