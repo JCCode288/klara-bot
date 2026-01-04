@@ -76,6 +76,7 @@ The project includes a `Makefile` with the following commands:
 - `make run_logger`: Runs the log service locally.
 - `make build`: Creates a zip archive of the bot for deployment.
 - `make compose`: Builds and runs the Docker containers in detached mode.
+- `make deploy`: Deploys the Docker containers by moving `env-prod` to `.env.prod` and running `docker compose up --build`.
 - `make dev`: A convenience command for development, equivalent to `make compose`.
 
 ## Deployment
