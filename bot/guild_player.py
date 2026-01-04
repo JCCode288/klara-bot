@@ -40,19 +40,18 @@ class GuildPlayer:
 
         loop = asyncio.get_event_loop()
         
-        query_parts = query.split('#')
-        song_query = query_parts[0].strip()
-        tags = [tag.strip() for tag in query_parts[1:]]
-
+        song_query = query.strip()
         def get_song_info():
             with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
-                return ydl.extract_info(f"ytsearch:{song_query}", download=False)['entries'][0]
+                info = ydl.extract_info(f"ytsearch:{song_query}", download=False)
+                return info["entries"][0]
 
         try:
             info = await loop.run_in_executor(None, get_song_info)
-            url = info['url']
+            url = info['url'] # expecting error when undefined
+            tags = [tag.strip() for tag in info.get("tags", [])]
             webpage_url = info.get("webpage_url")
-            title = info.get('title', 'Unknown Title')
+            title = info.get('title', 'Unknown Title').strip()
             duration = info.get('duration', 0)  # duration in seconds
         except Exception as e:
             await ctx.send("There was an error searching for the song.")
@@ -90,6 +89,7 @@ class GuildPlayer:
 
         song_url = song_data.get("url")
         song_title = song_data.get("title")
+        webpage_url = song_data.get("webpage_url", song_url)
 
         if not song_url:
             return await ctx.send("Failed to retrieve song url.")
@@ -99,13 +99,13 @@ class GuildPlayer:
         def after_play(e):
             listened_members = [
                 {"id": member.id, "name": member.name}
-                for member in ctx.voice_client.channel.members
+                for member in ctx.voice_client.channel.members if not member.bot
             ]
             
             event_data = {
                 "guild_id": self.guild.id,
                 "guild_name": self.guild.name,
-                "song_url": song_url,
+                "song_url": webpage_url,
                 "song_title": song_title,
                 "listened_members": listened_members,
             }
@@ -121,7 +121,7 @@ class GuildPlayer:
             self.is_playing = False
             return ctx.send("No more song to play.")
 
-        if song_data and self.voice_client:
+        if self.voice_client:
             msg = f"Playing {song_title or "unnamed song"}."
             await ctx.send(msg)
     

@@ -41,13 +41,14 @@ class Neo4jConnection:
 
         MERGE (s:Song {url: $song_url})
         ON CREATE SET s.title = $song_title, s.duration = $song_duration, s.added_at = timestamp()
+        ON MATCH SET s.title = $song_title, s.duration = $song_duration
 
         MERGE (g:Guild {id: $guild_id})
         ON CREATE SET g.name = $guild_name
         ON MATCH SET g.name = $guild_name
         
         MERGE (u)-[:ADDED]->(s)
-        MERGE (s)-[:IN_GUILD]->(g)
+        MERGE (u)-[:IN_GUILD]->(g)
         
         FOREACH (tag_name IN $song_tags |
             MERGE (t:Tag {name: tag_name})
@@ -61,18 +62,19 @@ class Neo4jConnection:
     def _create_song_listened_graph(tx, data):
         query = """
         MERGE (s:Song {url: $song_url})
+        ON CREATE SET s.title = $song_title, s.added_at = timestamp(), s.url = $song_url
+        ON MATCH SET s.title = $song_title
 
         MERGE (g:Guild {id: $guild_id})
         ON CREATE SET g.name = $guild_name
         ON MATCH SET g.name = $guild_name
-
-        MERGE (s)-[:IN_GUILD]->(g)
 
         FOREACH (member IN $listened_members |
             MERGE (u:User {id: member.id})
             ON CREATE SET u.name = member.name
             ON MATCH SET u.name = member.name
             MERGE (u)-[:LISTENED]->(s)
+            MERGE (u)-[:IN_GUILD]->(g)
         )
         """
         tx.run(query, **data)
@@ -131,10 +133,13 @@ def main():
             channel = message['channel'].decode('utf-8')
             data = json.loads(message['data'])
             
-            if channel == 'song_added':
-                neo4j_conn.process_song_data(data)
-            elif channel == 'song_listened':
-                neo4j_conn.process_song_listened_data(data)
-
+            try:
+                if channel == 'song_added':
+                    neo4j_conn.process_song_data(data)
+                elif channel == 'song_listened':
+                    neo4j_conn.process_song_listened_data(data)
+            except Exception as err:
+                print(f"{err=}")
+                
 if __name__ == "__main__":
     main()
