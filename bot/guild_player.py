@@ -113,11 +113,13 @@ class GuildPlayer:
             listened_members = [
                 {"id": member.id, "name": member.name}
                 for member in ctx.voice_client.channel.members if not member.bot
+                for member in ctx.voice_client.channel.members if not member.bot
             ]
             
             event_data = {
                 "guild_id": self.guild.id,
                 "guild_name": self.guild.name,
+                "song_url": webpage_url,
                 "song_url": webpage_url,
                 "song_title": song_title,
                 "listened_members": listened_members,
@@ -134,6 +136,7 @@ class GuildPlayer:
             self.is_playing = False
             return ctx.send("No more song to play.")
 
+        if self.voice_client:
         if self.voice_client:
             msg = f"Playing {song_title or "unnamed song"}."
             await ctx.send(msg)
