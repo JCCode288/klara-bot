@@ -1,7 +1,8 @@
 import asyncio
 import discord
 import yt_dlp
-from redis_queue import add_to_queue, get_from_queue, get_queue, clear_queue, remove_from_queue, set_repeat, get_repeat, remove_first_queue, publish_song_added, publish_song_listened
+from urllib.parse import parse_qs, urlparse
+from redis_queue import add_to_queue, get_from_queue, get_queue, clear_queue, remove_from_queue, set_repeat, get_repeat, remove_first_queue, publish_song_added, publish_song_listened, set_song_url, get_song_url
 
 YDL_OPTIONS = {'format': 'bestaudio', 'noplaylist': 'True'}
 FFMPEG_OPTIONS = {
@@ -18,6 +19,7 @@ class GuildPlayer:
         self.repeat = False
         self.current_song = None
         self.repeat = get_repeat(guild.id) or False
+        self.max_retries = 2
 
     async def join(self, channel: discord.VoiceChannel):
         """Joins a voice channel."""
@@ -32,6 +34,14 @@ class GuildPlayer:
             await self.voice_client.disconnect()
             self.voice_client = None
         clear_queue(self.guild.id)
+    
+    def get_song_info(self, song_query: str):
+        with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
+            info = ydl.extract_info(
+                f"ytsearch:{song_query}", 
+                download=False
+            )
+            return info["entries"][0]
 
     async def play(self, query: str, ctx):
         """Plays a song from a query."""
@@ -39,18 +49,13 @@ class GuildPlayer:
             return
 
         loop = asyncio.get_event_loop()
-        
         song_query = query.strip()
-        def get_song_info():
-            with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
-                info = ydl.extract_info(f"ytsearch:{song_query}", download=False)
-                return info["entries"][0]
 
         try:
-            info = await loop.run_in_executor(None, get_song_info)
-            url = info['url'] # expecting error when undefined
+            info = await loop.run_in_executor(None, self.get_song_info, song_query)
             tags = [tag.strip() for tag in info.get("tags", [])]
-            webpage_url = info.get("webpage_url")
+            webpage_url = info["webpage_url"] # expecting error when this undefined
+            url = info['url'] # expecting error when this undefined
             title = info.get('title', 'Unknown Title').strip()
             duration = info.get('duration', 0)  # duration in seconds
         except Exception as e:
@@ -58,8 +63,10 @@ class GuildPlayer:
             print(f"Error fetching song info: {e}")
             return
 
-        song_data = {"url": url, "title": title, "duration": duration, "webpage_url": webpage_url}
+        song_data = {"title": title, "duration": duration, "webpage_url": webpage_url}
+        expired_at = self._get_song_expiration(url)
         add_to_queue(self.guild.id, song_data)
+        set_song_url(webpage_url, url, expired_at)
         
         event_data = {
             "guild_id": self.guild.id,
@@ -79,17 +86,23 @@ class GuildPlayer:
             await ctx.send(f"{song_data['title']} is added to queue.")
 
 
-    async def play_next(self, ctx):
+    async def play_next(self, ctx, retries = 0):
         """Plays the next song in the queue."""
-
         song_data = get_from_queue(self.guild.id)
 
         if not song_data:
             return await ctx.send("No song in queue.")
 
-        song_url = song_data.get("url")
         song_title = song_data.get("title")
-        webpage_url = song_data.get("webpage_url", song_url)
+        webpage_url = song_data.get("webpage_url")
+        song_url = get_song_url(webpage_url)
+
+        if not song_url:
+            song_data = self.get_song_info(webpage_url)
+            webpage_url = song_data["webpage_url"]
+            song_url = song_data['url']
+            song_title = song_data.get('title')
+            set_song_url(webpage_url, song_url)
 
         if not song_url:
             return await ctx.send("Failed to retrieve song url.")
@@ -100,11 +113,13 @@ class GuildPlayer:
             listened_members = [
                 {"id": member.id, "name": member.name}
                 for member in ctx.voice_client.channel.members if not member.bot
+                for member in ctx.voice_client.channel.members if not member.bot
             ]
             
             event_data = {
                 "guild_id": self.guild.id,
                 "guild_name": self.guild.name,
+                "song_url": webpage_url,
                 "song_url": webpage_url,
                 "song_title": song_title,
                 "listened_members": listened_members,
@@ -125,11 +140,19 @@ class GuildPlayer:
             msg = f"Playing {song_title or "unnamed song"}."
             await ctx.send(msg)
     
-            self.is_playing = True
-            self.voice_client.play(
-                discord.FFmpegPCMAudio(song_url, **FFMPEG_OPTIONS),
-                after=after_play,
-            )
+            try:
+                self.is_playing = True
+                self.voice_client.play(
+                    discord.FFmpegPCMAudio(song_url, **FFMPEG_OPTIONS),
+                    after=after_play,
+                )
+            except Exception as err:
+                print(err)
+                self.is_playing = False
+                if retries < self.max_retries:
+                    return self.play_next(ctx, retries + 1)
+                else:
+                    return await ctx.send("Failed to play song")
         else:
             ctx.send("Something happened. Please try again.")
             print("Failed to play song.")
@@ -164,3 +187,13 @@ class GuildPlayer:
         if self.voice_client and self.is_playing:
             self.voice_client.stop()
             # play_next will be called by the 'after' callback in play
+
+    def _get_song_expiration(self, url_str: str):
+        parsed_url = urlparse(url_str)
+        parsed_query = parse_qs(parsed_url.query)
+
+        expirations = parsed_query.get("expire", [])
+        if not len(expirations):
+            return None
+        
+        return int(expirations[0])
