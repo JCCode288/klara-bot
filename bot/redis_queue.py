@@ -31,6 +31,14 @@ def get_queue(guild_id: int):
     queue_json_list = r.lrange(f"queue:{guild_id}", 0, -1)
     return [json.loads(song_json) for song_json in queue_json_list]
 
+def get_song_url(webpage_url: str):
+    """Get song url if it was not expired"""
+    return r.get(webpage_url)
+
+def set_song_url(webpage_url: str, url: str, expired_at: int):
+    """Set youtube song url with expiration date"""
+    r.set(webpage_url, url, exat=expired_at)
+
 def remove_from_queue(guild_id: int, index: int):
     """Removes a song from the queue at a specific index."""
     # To remove by index, we need to do a little trick.
