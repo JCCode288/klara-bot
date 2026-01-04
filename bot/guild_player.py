@@ -137,7 +137,6 @@ class GuildPlayer:
             return ctx.send("No more song to play.")
 
         if self.voice_client:
-        if self.voice_client:
             msg = f"Playing {song_title or "unnamed song"}."
             await ctx.send(msg)
     

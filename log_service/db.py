@@ -1,4 +1,4 @@
-from log_service.db import GraphDatabase
+from neo4j import GraphDatabase
 
 class Neo4j:
     def __init__(self, uri, user, password):
