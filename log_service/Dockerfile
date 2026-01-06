@@ -10,7 +10,7 @@ COPY requirements.txt .
 RUN pip install -r ./requirements.txt
 
 # Copy the rest of the application code
-COPY main.py .
+COPY . .
 
 CMD ["python", "-u", "./main.py"]
 
