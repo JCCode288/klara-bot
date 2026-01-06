@@ -33,7 +33,6 @@ class GuildPlayer:
         if self.voice_client:
             await self.voice_client.disconnect()
             self.voice_client = None
-        clear_queue(self.guild.id)
     
     def get_song_info(self, song_query: str):
         with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
