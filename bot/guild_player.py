@@ -101,7 +101,12 @@ class GuildPlayer:
             webpage_url = song_data["webpage_url"]
             song_url = song_data['url']
             song_title = song_data.get('title')
-            set_song_url(webpage_url, song_url)
+            expired_at = self._get_song_expiration(song_url)
+
+            if not song_url or not webpage_url or not expired_at:
+                return await ctx.send("Failed to retrieve song url.")
+
+            set_song_url(webpage_url, song_url, expired_at)
 
         if not song_url:
             return await ctx.send("Failed to retrieve song url.")
