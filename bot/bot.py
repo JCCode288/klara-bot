@@ -48,8 +48,13 @@ async def join(ctx):
     if ctx.author.voice:
         channel = ctx.author.voice.channel
         player = get_player(ctx)
-        await player.join(channel)
-        await ctx.send(f"Joined {channel.name}")
+        if not player.voice_channel:
+            await player.join(channel)
+            await ctx.send(f"Joined {channel.name}")
+        else:
+            await player.leave()
+            await player.join(channel)
+            await ctx.send(f"Rejoining {channel.name}")
     else:
         await ctx.send("You are not in a voice channel.")
 
@@ -66,18 +71,15 @@ async def play(ctx, *, query=None):
     Syntax: `!play <query:optional> <separator \";;\":optional> <...query:optional>` 
     Usage: `!play yoasobi tabun ;; yoasobi blessing`"""
     player = get_player(ctx)
+
     if not ctx.author.voice:
         return await ctx.send("You are not in a voice channel.")
-
-    if not query:
-        if ctx.author.voice:
-            await player.join(ctx.author.voice.channel)
-
-        return await player.play_next(ctx)
     
     if not player.voice_client:
-        if ctx.author.voice:
-            await player.join(ctx.author.voice.channel)
+        await player.join(ctx.author.voice.channel)
+
+    if not query:
+        return await player.play_next(ctx)
         
     queries = list(map(lambda x: x.strip(), query.split(";;")))
 
@@ -85,7 +87,7 @@ async def play(ctx, *, query=None):
         await ctx.send(f"Searching for `{query}`...")
         await player.play(query, ctx)
     elif len(queries) >= 2:
-        await ctx.send(f"Multiple query found for `{", ".join(queries)}...`")
+        await ctx.send(f"Multiple query found for `{"\n".join(queries)}`")
 
         for query in queries:
             await player.play(query, ctx)
