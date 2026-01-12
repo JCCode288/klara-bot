@@ -48,7 +48,7 @@ async def join(ctx):
     if ctx.author.voice:
         channel = ctx.author.voice.channel
         player = get_player(ctx)
-        if not player.voice_channel:
+        if not player.voice_client:
             await player.join(channel)
             await ctx.send(f"Joined {channel.name}")
         else:
