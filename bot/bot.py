@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 import os
 from dotenv import load_dotenv
-from guild_player import GuildPlayer
+from players import Players
 from typing import Any
 
 load_dotenv()
@@ -23,24 +23,23 @@ if env == "production":
 
 bot = commands.AutoShardedBot(command_prefix=prefix, intents=intents)
 
-players = {}
-
-def get_player(ctx):
-    """Gets the player for the current guild."""
-    guild = ctx.guild
-    if guild.id not in players:
-        players[guild.id] = GuildPlayer(guild, bot)
-    return players[guild.id]
+players = Players(bot)
 
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user.name}')
 
-@bot.event
-async def on_voice_state_update(member, before, after):
-    if member.id == bot.user.id and before.channel is not None and after.channel is None:
-        if member.guild.id in players:
-            del players[member.guild.id]
+# @bot.event
+# async def on_voice_state_update(member, before, after):
+#     try:
+#         ctx = before.channel or after.channel
+#         player = players.get_player(ctx)
+#         if after.channel is None or not getattr(after.channel, "members"):
+#             await player.leave()
+#             players.remove_player(ctx)
+#     except Exception as err:
+#         print("=== Something happened ===")
+#         print(err)
 
 @bot.command()
 async def join(ctx):
@@ -48,7 +47,7 @@ async def join(ctx):
     try:
         if ctx.author.voice:
             channel = ctx.author.voice.channel
-            player = get_player(ctx)
+            player = players.get_player(ctx)
             if not player.voice_client:
                 await player.join(channel)
                 await ctx.send(f"Joined {channel.name}")
@@ -67,7 +66,7 @@ async def join(ctx):
 async def leave(ctx):
     """Make Clara leaving channel. Usage: `!leave`"""
     try:
-        player = get_player(ctx)
+        player = players.get_player(ctx)
         await player.leave()
         await ctx.send("Left the voice channel.")
     except Exception as err:
@@ -80,7 +79,7 @@ async def play(ctx, *, query=None):
     Syntax: `!play <query:optional> <separator \";;\":optional> <...query:optional>` 
     Usage: `!play yoasobi tabun ;; yoasobi blessing`"""
     try:
-        player = get_player(ctx)
+        player = players.get_player(ctx)
 
         if not ctx.author.voice:
             return await ctx.send("You are not in a voice channel.")
@@ -112,7 +111,7 @@ async def play(ctx, *, query=None):
 async def skip(ctx):
     """Clara will skip currently playing song. Usage: `!skip`"""
     try:
-        player = get_player(ctx)
+        player = players.get_player(ctx)
         await player.skip()
         await ctx.send("Skipped the current song.")
     except Exception as err:
@@ -146,7 +145,7 @@ def parse_queue(song_queue: list[Any]):
 async def queue(ctx):
     """List of currently queued song, song will be saved unless cleared. Usage: `!queue`"""
     try:
-        player = get_player(ctx)
+        player = players.get_player(ctx)
         song_queue = player.get_queue()
         if song_queue:
             message = parse_queue(song_queue)
@@ -161,7 +160,7 @@ async def queue(ctx):
 async def current_song(ctx):
     """Clara will show currently playing song. Usage: `!current_song`"""
     try:
-        player = get_player(ctx)
+        player = players.get_player(ctx)
         now_playing = player.current_song
         is_playing = player.is_playing
 
@@ -179,7 +178,7 @@ async def current_song(ctx):
 async def stop(ctx):
     """Clara will stop currently playing song and will clear all queues. Usage: `!stop`"""
     try:
-        player = get_player(ctx)
+        player = players.get_player(ctx)
         await player.stop()
         await ctx.send("Stopped the music and cleared the queue.")
     except Exception as err:
@@ -190,7 +189,7 @@ async def stop(ctx):
 async def pause(ctx):
     """Clara will pause currently playing song. Usage: `!pause`"""
     try:
-        player = get_player(ctx)
+        player = players.get_player(ctx)
         if player.voice_client and player.voice_client.is_playing():
             player.voice_client.pause()
             await ctx.send("Paused the song.")
@@ -204,7 +203,7 @@ async def pause(ctx):
 async def resume(ctx):
     """Clara will resume currently paused song. Usage: `!resume`"""
     try:
-        player = get_player(ctx)
+        player = players.get_player(ctx)
         if player.voice_client and player.voice_client.is_paused():
             player.voice_client.resume()
             await ctx.send("Resumed the song.")
@@ -220,7 +219,7 @@ async def remove(ctx, index: int):
     Syntax: `!remove <index>`
     Usage: `!remove 1`"""
     try:
-        player = get_player(ctx)
+        player = players.get_player(ctx)
         player.remove_from_queue(index - 1)
         await ctx.send(f"Removed song at position {index}.")
     except Exception as err:
@@ -231,7 +230,7 @@ async def remove(ctx, index: int):
 async def repeat(ctx):
     """Clara will toggle repeat mode. Configuration will be saved. Usage: `!repeat`"""
     try:
-        player = get_player(ctx)
+        player = players.get_player(ctx)
         is_repeating = player.toggle_repeat()
         if is_repeating:
             await ctx.send("Repeat mode is now ON.")
