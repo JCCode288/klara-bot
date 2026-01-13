@@ -1,5 +1,6 @@
 import asyncio
 import discord
+from discord.ext.commands import AutoShardedBot
 import yt_dlp
 from urllib.parse import parse_qs, urlparse
 from redis_queue import add_to_queue, get_from_queue, get_queue, clear_queue, remove_from_queue, set_repeat, get_repeat, remove_first_queue, publish_song_added, publish_song_listened, set_song_url, get_song_url
@@ -11,15 +12,21 @@ FFMPEG_OPTIONS = {
 }
 
 class GuildPlayer:
-    def __init__(self, guild: discord.Guild, bot):
+    def __init__(self, guild: discord.Guild, bot: AutoShardedBot):
         self.guild = guild
         self.bot = bot
         self.voice_client = None
+        self.joined = False
         self.is_playing = False
         self.repeat = False
         self.current_song = None
         self.repeat = get_repeat(guild.id) or False
         self.max_retries = 2
+
+        if guild.voice_client:
+            self.voice_client = guild.voice_client
+            self.joined = guild.voice_client.is_connected()
+            self.is_playing = guild.voice_client.is_playing()
 
     async def join(self, channel: discord.VoiceChannel):
         """Joins a voice channel."""
@@ -27,12 +34,15 @@ class GuildPlayer:
             await self.voice_client.move_to(channel)
         else:
             self.voice_client = await channel.connect()
+        
+        self.joined = True
 
     async def leave(self):
         """Leaves the voice channel."""
         if self.voice_client:
             await self.voice_client.disconnect()
             self.voice_client = None
+            self.joined = False
     
     def get_song_info(self, song_query: str):
         with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
@@ -113,10 +123,9 @@ class GuildPlayer:
 
         self.current_song = song_data
 
-        def after_play(e):
+        async def after_play(e):
             listened_members = [
                 {"id": member.id, "name": member.name}
-                for member in ctx.voice_client.channel.members if not member.bot
                 for member in ctx.voice_client.channel.members if not member.bot
             ]
             
@@ -134,7 +143,7 @@ class GuildPlayer:
             if self.repeat:
                 add_to_queue(self.guild.id, self.current_song)
             
-            return self.bot.loop.create_task(self.play_next(ctx))
+            return await self.bot.loop.create_task(self.play_next(ctx))
 
         if not self.current_song:
             self.is_playing = False
@@ -154,7 +163,7 @@ class GuildPlayer:
                 print(err)
                 self.is_playing = False
                 if retries < self.max_retries:
-                    return self.play_next(ctx, retries + 1)
+                    return await self.play_next(ctx, retries + 1)
                 else:
                     return await ctx.send("Failed to play song")
         else:
@@ -185,6 +194,7 @@ class GuildPlayer:
         clear_queue(self.guild.id)
         self.is_playing = False
         self.current_song = None
+        self.joined = False
 
     async def skip(self):
         """Skips the current song."""
