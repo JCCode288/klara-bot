@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 import os
 from dotenv import load_dotenv
-from guild_player import GuildPlayer
+from players import Players
 from typing import Any
 
 load_dotenv()
@@ -23,84 +23,100 @@ if env == "production":
 
 bot = commands.AutoShardedBot(command_prefix=prefix, intents=intents)
 
-players = {}
-
-def get_player(ctx):
-    """Gets the player for the current guild."""
-    guild = ctx.guild
-    if guild.id not in players:
-        players[guild.id] = GuildPlayer(guild, bot)
-    return players[guild.id]
+players = Players(bot)
 
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user.name}')
 
-@bot.event
-async def on_voice_state_update(member, before, after):
-    if member.id == bot.user.id and before.channel is not None and after.channel is None:
-        if member.guild.id in players:
-            del players[member.guild.id]
+# @bot.event
+# async def on_voice_state_update(member, before, after):
+#     try:
+#         ctx = before.channel or after.channel
+#         player = players.get_player(ctx)
+#         if after.channel is None or not getattr(after.channel, "members"):
+#             await player.leave()
+#             players.remove_player(ctx)
+#     except Exception as err:
+#         print("=== Something happened ===")
+#         print(err)
 
 @bot.command()
 async def join(ctx):
     """Make Clara joining channel. Usage: `!join`"""
-    if ctx.author.voice:
-        channel = ctx.author.voice.channel
-        player = get_player(ctx)
-        if not player.voice_client:
-            await player.join(channel)
-            await ctx.send(f"Joined {channel.name}")
+    try:
+        if ctx.author.voice:
+            channel = ctx.author.voice.channel
+            player = players.get_player(ctx)
+            if not player.voice_client:
+                await player.join(channel)
+                await ctx.send(f"Joined {channel.name}")
+            else:
+                await player.leave()
+                await player.join(channel)
+                await ctx.send(f"Rejoining {channel.name}")
         else:
-            await player.leave()
-            await player.join(channel)
-            await ctx.send(f"Rejoining {channel.name}")
-    else:
-        await ctx.send("You are not in a voice channel.")
+            await ctx.send("You are not in a voice channel.")
+    except Exception as err:
+        print("Something happened")
+        print(err)
+        return
 
 @bot.command()
 async def leave(ctx):
     """Make Clara leaving channel. Usage: `!leave`"""
-    player = get_player(ctx)
-    await player.leave()
-    await ctx.send("Left the voice channel.")
+    try:
+        player = players.get_player(ctx)
+        await player.leave()
+        await ctx.send("Left the voice channel.")
+    except Exception as err:
+        print("Something happened")
+        print(err)
 
 @bot.command()
 async def play(ctx, *, query=None):
     """Clara will playing song. 
     Syntax: `!play <query:optional> <separator \";;\":optional> <...query:optional>` 
     Usage: `!play yoasobi tabun ;; yoasobi blessing`"""
-    player = get_player(ctx)
+    try:
+        player = players.get_player(ctx)
 
-    if not ctx.author.voice:
-        return await ctx.send("You are not in a voice channel.")
-    
-    if not player.voice_client:
-        await player.join(ctx.author.voice.channel)
-
-    if not query:
-        return await player.play_next(ctx)
+        if not ctx.author.voice:
+            return await ctx.send("You are not in a voice channel.")
         
-    queries = list(map(lambda x: x.strip(), query.split(";;")))
+        if not player.voice_client:
+            await player.join(ctx.author.voice.channel)
 
-    if len(queries) < 2 and query:
-        await ctx.send(f"Searching for `{query}`...")
-        await player.play(query, ctx)
-    elif len(queries) >= 2:
-        await ctx.send(f"Multiple query found for `{"\n".join(queries)}`")
+        if not query:
+            return await player.play_next(ctx)
+            
+        queries = list(map(lambda x: x.strip(), query.split(";;")))
 
-        for query in queries:
+        if len(queries) < 2 and query:
+            await ctx.send(f"Searching for `{query}`...")
             await player.play(query, ctx)
-    else:
-        await ctx.send(f"Invalid command.")
+        elif len(queries) >= 2:
+            await ctx.send(f"Multiple query found for `{"\n".join(queries)}`")
+
+            for query in queries:
+                await player.play(query, ctx)
+        else:
+            await ctx.send(f"Invalid command.")
+    except Exception as err:
+        print("Somethign happened")
+        print(err)
    
 
 @bot.command()
 async def skip(ctx):
     """Clara will skip currently playing song. Usage: `!skip`"""
-    player = get_player(ctx)
-    await player.skip()
-    await ctx.send("Skipped the current song.")
+    try:
+        player = players.get_player(ctx)
+        await player.skip()
+        await ctx.send("Skipped the current song.")
+    except Exception as err:
+        print("Something happened")
+        print(err)
 
 def format_duration(seconds):
     minutes, seconds = divmod(seconds, 60)
@@ -128,74 +144,101 @@ def parse_queue(song_queue: list[Any]):
 @bot.command()
 async def queue(ctx):
     """List of currently queued song, song will be saved unless cleared. Usage: `!queue`"""
-    player = get_player(ctx)
-    song_queue = player.get_queue()
-    if song_queue:
-        message = parse_queue(song_queue)
-        await ctx.send(message)
-    else:
-        await ctx.send("The song queue is empty.")
+    try:
+        player = players.get_player(ctx)
+        song_queue = player.get_queue()
+        if song_queue:
+            message = parse_queue(song_queue)
+            await ctx.send(message)
+        else:
+            await ctx.send("The song queue is empty.")
+    except Exception as err:
+        print("Something error")
+        print(err)
 
 @bot.command()
 async def current_song(ctx):
     """Clara will show currently playing song. Usage: `!current_song`"""
-    player = get_player(ctx)
-    now_playing = player.current_song
-    is_playing = player.is_playing
+    try:
+        player = players.get_player(ctx)
+        now_playing = player.current_song
+        is_playing = player.is_playing
 
-    if now_playing and is_playing:
-        await ctx.send(f"Currently playing {now_playing.get("title")}.")
-    elif now_playing and not is_playing:
-        await ctx.send(f"First song in the playlist is {now_playing.get("title")}.")
-    else:
-        await ctx.send(f"Clara has no song in the list.")
+        if now_playing and is_playing:
+            await ctx.send(f"Currently playing {now_playing.get("title")}.")
+        elif now_playing and not is_playing:
+            await ctx.send(f"First song in the playlist is {now_playing.get("title")}.")
+        else:
+            await ctx.send(f"Clara has no song in the list.")
+    except Exception as err:
+        print("Something happened")
+        print(err)
 
 @bot.command()
 async def stop(ctx):
     """Clara will stop currently playing song and will clear all queues. Usage: `!stop`"""
-    player = get_player(ctx)
-    await player.stop()
-    await ctx.send("Stopped the music and cleared the queue.")
+    try:
+        player = players.get_player(ctx)
+        await player.stop()
+        await ctx.send("Stopped the music and cleared the queue.")
+    except Exception as err:
+        print("Something happened")
+        print(err)
 
 @bot.command()
 async def pause(ctx):
     """Clara will pause currently playing song. Usage: `!pause`"""
-    player = get_player(ctx)
-    if player.voice_client and player.voice_client.is_playing():
-        player.voice_client.pause()
-        await ctx.send("Paused the song.")
-    else:
-        await ctx.send("I'm not playing anything.")
+    try:
+        player = players.get_player(ctx)
+        if player.voice_client and player.voice_client.is_playing():
+            player.voice_client.pause()
+            await ctx.send("Paused the song.")
+        else:
+            await ctx.send("I'm not playing anything.")
+    except Exception as err:
+        print("Something happeend")
+        print(err)
 
 @bot.command()
 async def resume(ctx):
     """Clara will resume currently paused song. Usage: `!resume`"""
-    player = get_player(ctx)
-    if player.voice_client and player.voice_client.is_paused():
-        player.voice_client.resume()
-        await ctx.send("Resumed the song.")
-    else:
-        await ctx.send("The song is not paused.")
+    try:
+        player = players.get_player(ctx)
+        if player.voice_client and player.voice_client.is_paused():
+            player.voice_client.resume()
+            await ctx.send("Resumed the song.")
+        else:
+            await ctx.send("The song is not paused.")
+    except Exception as err:
+        print("Something happened")
+        print(err)
 
 @bot.command()
 async def remove(ctx, index: int):
     """Clara will remove song from queue based on index of song in queue. 
     Syntax: `!remove <index>`
     Usage: `!remove 1`"""
-    player = get_player(ctx)
-    player.remove_from_queue(index - 1)
-    await ctx.send(f"Removed song at position {index}.")
+    try:
+        player = players.get_player(ctx)
+        player.remove_from_queue(index - 1)
+        await ctx.send(f"Removed song at position {index}.")
+    except Exception as err:
+        print("Something happened")
+        print(err)
 
 @bot.command()
 async def repeat(ctx):
     """Clara will toggle repeat mode. Configuration will be saved. Usage: `!repeat`"""
-    player = get_player(ctx)
-    is_repeating = player.toggle_repeat()
-    if is_repeating:
-        await ctx.send("Repeat mode is now ON.")
-    else:
-        await ctx.send("Repeat mode is now OFF.")
-
+    try:
+        player = players.get_player(ctx)
+        is_repeating = player.toggle_repeat()
+        if is_repeating:
+            await ctx.send("Repeat mode is now ON.")
+        else:
+            await ctx.send("Repeat mode is now OFF.")
+    except Exception as err:
+        print("Something happened")
+        print(err)
 
 TOKEN = os.getenv('DISCORD_TOKEN')
 if TOKEN is None:
