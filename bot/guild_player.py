@@ -123,7 +123,7 @@ class GuildPlayer:
 
         self.current_song = song_data
 
-        async def after_play(e):
+        def after_play(e):
             listened_members = [
                 {"id": member.id, "name": member.name}
                 for member in ctx.voice_client.channel.members if not member.bot
@@ -143,7 +143,7 @@ class GuildPlayer:
             if self.repeat:
                 add_to_queue(self.guild.id, self.current_song)
             
-            return await self.bot.loop.create_task(self.play_next(ctx))
+            return self.bot.loop.create_task(self.play_next(ctx))
 
         if not self.current_song:
             self.is_playing = False
