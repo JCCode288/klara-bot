@@ -175,7 +175,7 @@ async def current_song(ctx):
         print(err)
 
 @bot.command()
-async def stop(ctx):
+async def clear(ctx):
     """Clara will stop currently playing song and will clear all queues. Usage: `!stop`"""
     try:
         player = players.get_player(ctx)
