@@ -9,10 +9,16 @@ r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0) # decode_responses=False
 
 def add_to_queue(guild_id: int, song_data: dict):
     """Adds a song to the end of a guild's queue."""
+    if not guild_id or not song_data:
+        return 
+    
     r.rpush(f"queue:{guild_id}", json.dumps(song_data))
 
 def add_to_front_of_queue(guild_id: int, song_data: dict):
     """Adds a song to the front of a guild's queue."""
+    if not guild_id or not song_data:
+        return
+    
     r.lpush(f"queue:{guild_id}", json.dumps(song_data))
 
 def get_from_queue(guild_id: int):
@@ -35,26 +41,26 @@ def get_queue(guild_id: int):
 
 def get_song_url(webpage_url: str):
     """Get song url if it was not expired"""
+    if not webpage_url:
+        return
+    
     return r.get(webpage_url)
 
 def set_song_url(webpage_url: str, url: str, expired_at: int):
     """Set youtube song url with expiration date"""
+    if not webpage_url or not url or not expired_at:
+        return
+    
     r.set(webpage_url, url, exat=expired_at)
 
 def remove_from_queue(guild_id: int, index: int):
     """Removes a song from the queue at a specific index."""
-    # To remove by index, we need to do a little trick.
-    # We set the value at the index to a temporary unique value,
-    # then use LREM to remove that value.
-    # First, get the current length to ensure index is valid
     queue_len = r.llen(f"queue:{guild_id}")
     if not (-queue_len <= index < queue_len):
         return False # Index out of bounds
 
-    # Get the item to be removed
     item_to_remove_json = r.lindex(f"queue:{guild_id}", index)
     if item_to_remove_json:
-        # Remove all occurrences of this item (should be only one at this index)
         r.lrem(f"queue:{guild_id}", 0, item_to_remove_json)
         return True
     return False

@@ -61,7 +61,7 @@ class GuildPlayer:
             if not entries or not len(entries):
                 return None
             
-            return info["entries"][0]
+            return entries[0]
 
     async def play(self, query: str, ctx):
         """Plays a song from a query."""
@@ -76,19 +76,20 @@ class GuildPlayer:
 
             if not info:
                 raise RuntimeError("Failed to get song info")
-
+            
             tags = [tag.strip() for tag in info.get("tags", [])]
             webpage_url = info["webpage_url"] # expecting error when this undefined
             url = info['url'] # expecting error when this undefined
             title = info.get('title', 'Unknown Title').strip()
             duration = info.get('duration', 0)  # duration in seconds
+            print(f"{webpage_url=}; {url=}; {duration=}")
         except Exception as e:
             await ctx.send("There was an error searching for the song.")
             print(f"Error fetching song info: {e}")
             return
 
-        if not webpage_url:
-            return ctx.send("Cannot found youtube for current song. Can you be more specific or change the word order?")
+        if not webpage_url or not url:
+            return await ctx.send("Cannot found youtube for current song. Can you be more specific or change the word order?")
 
         song_data = {"title": title, "duration": duration, "webpage_url": webpage_url}
         expired_at = self._get_song_expiration(url)
@@ -221,6 +222,9 @@ class GuildPlayer:
             # play_next will be called by the 'after' callback in play
 
     def _get_song_expiration(self, url_str: str):
+        if not url_str:
+            return None
+        
         parsed_url = urlparse(url_str)
         parsed_query = parse_qs(parsed_url.query)
 
