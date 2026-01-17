@@ -45,11 +45,22 @@ class GuildPlayer:
             self.joined = False
     
     def get_song_info(self, song_query: str):
+        if song_query.startswith('http'):
+            query_parsed = urlparse(song_query)
+            if "si=" in query_parsed.query:
+                song_query = song_query.strip("?" + query_parsed.query)
+
+        url = f"ytsearch:{song_query}"
+
         with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
             info = ydl.extract_info(
-                f"ytsearch:{song_query}", 
+                url, 
                 download=False
             )
+            entries = info.get("entries")
+            if not entries or not len(entries):
+                return None
+            
             return info["entries"][0]
 
     async def play(self, query: str, ctx):
@@ -62,6 +73,10 @@ class GuildPlayer:
 
         try:
             info = await loop.run_in_executor(None, self.get_song_info, song_query)
+
+            if not info:
+                raise RuntimeError("Failed to get song info")
+
             tags = [tag.strip() for tag in info.get("tags", [])]
             webpage_url = info["webpage_url"] # expecting error when this undefined
             url = info['url'] # expecting error when this undefined
@@ -71,6 +86,9 @@ class GuildPlayer:
             await ctx.send("There was an error searching for the song.")
             print(f"Error fetching song info: {e}")
             return
+
+        if not webpage_url:
+            return ctx.send("Cannot found youtube for current song. Can you be more specific or change the word order?")
 
         song_data = {"title": title, "duration": duration, "webpage_url": webpage_url}
         expired_at = self._get_song_expiration(url)

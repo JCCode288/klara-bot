@@ -24,12 +24,14 @@ def get_from_queue(guild_id: int):
 
 def remove_first_queue(guild_id: int):
     song_json = r.lpop(f"queue:{guild_id}")
+    if not song_json: 
+        return None
     return json.loads(song_json)
 
 def get_queue(guild_id: int):
     """Gets the entire queue for a guild without modifying it."""
     queue_json_list = r.lrange(f"queue:{guild_id}", 0, -1)
-    return [json.loads(song_json) for song_json in queue_json_list]
+    return [json.loads(song_json) for song_json in queue_json_list if song_json]
 
 def get_song_url(webpage_url: str):
     """Get song url if it was not expired"""
